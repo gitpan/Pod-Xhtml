@@ -1,0 +1,13 @@
+Changes
+COPYING
+Makefile.PL
+MANIFEST
+MANIFEST.SKIP
+README
+lib/Pod/Xhtml.pm
+scripts/pod2xhtml.pl
+t/Test_LinkParser.pm
+t/01defaults.t
+t/a.pod
+t/02links.t
+META.yml                                 Module meta-data (added by MakeMaker)
