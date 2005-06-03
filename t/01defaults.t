@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 01defaults.t,v 1.11 2004/10/21 16:57:02 simonf Exp $
+#$Id: 01defaults.t,v 1.15 2005/06/01 14:21:52 simonf Exp $
 
 use strict;
 use lib qw(./lib ../lib);
@@ -17,7 +17,7 @@ my $podoa = 'a.xhtml';
 
 unlink $podoa if -e $podoa;
 
-plan tests => 9;
+plan tests => 13;
 
 ok( $Pod::Xhtml::VERSION );
 
@@ -48,58 +48,81 @@ ok( index( $filecont, cont_a() ) > -1 );
 undef $filecont;
 unlink $podoa;
 
+my $podib = 'b.pod';
+my $podob = 'b.xhtml';
 
+ok ( !-f $podob );
+$parser->parse_from_file( $podib, $podob );
+ok ( -f $podob );
+
+$filecont = readfile( $podob );
+ok( $filecont );
+ok( index( $filecont, cont_b() ) > -1 );
+undef $filecont;
+unlink $podob;
 
 sub cont_a {
 return q{
 <body>
-<a name="TOP"></a><!-- INDEX START -->
-<h3>Index</h3>
+<div class="pod">
+<!-- INDEX START -->
+<h3 id="TOP">Index</h3>
 <ul>
-	<li><a href="#NAME">NAME</a></li>	<li><a href="#SYNOPSIS">SYNOPSIS</a></li>	<li><a href="#DESCRIPTION">DESCRIPTION</a></li>	<li><a href="#Sed_diam_nomumny">Sed diam nomumny</a></li>	<li><a href="#METHODS">METHODS</a></li>	<ul>
-	<ul>
-	</ul>
-	</ul>
-	<li><a href="#ATTRIBUTES">ATTRIBUTES</a></li>	<ul>
-	</ul>
-	<li><a href="#ISSUES">ISSUES</a></li><ul>	<li><a href="#KNOWN_ISSUES">KNOWN ISSUES</a></li></ul><ul>	<li><a href="#UNKNOWN_ISSUES">UNKNOWN ISSUES</a></li></ul></ul><hr />
+	<li><a href="#NAME">NAME</a></li>
+	<li><a href="#SYNOPSIS">SYNOPSIS</a></li>
+	<li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+	<li><a href="#Sed_diam_nomumny">Sed diam nomumny</a></li>
+	<li><a href="#METHODS">METHODS</a></li>
+	<li><a href="#ATTRIBUTES">ATTRIBUTES</a></li>
+	<li><a href="#ISSUES">ISSUES</a><br />
+<ul>
+	<li><a href="#KNOWN_ISSUES">KNOWN ISSUES</a></li>
+	<li><a href="#UNKNOWN_ISSUES">UNKNOWN ISSUES</a></li>
+</ul>
+</li>
+</ul>
+<hr />
 <!-- INDEX END -->
 
-<h1><a name="NAME"></a>NAME</h1><p><a href="#TOP" class="toplink">Top</a></p>
+<h1 id="NAME">NAME</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <p>A - Some demo POD</p>
 
-<h1><a name="SYNOPSIS"></a>SYNOPSIS</h1><p><a href="#TOP" class="toplink">Top</a></p>
+<h1 id="SYNOPSIS">SYNOPSIS</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <pre>	use Pod::Xhtml;
 	my $px = new Pod::Xhtml;
 
-</pre>
-<h1><a name="DESCRIPTION"></a>DESCRIPTION</h1><p><a href="#TOP" class="toplink">Top</a></p>
+</pre><h1 id="DESCRIPTION">DESCRIPTION</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <p>This is a module to translate POD to Xhtml. Lorem ipsum <b>Dolor</b> in <cite>Dolor</cite> sit amet consectueur adipscing elit. Sed diam nomumny.
 This is a module to translate POD to Xhtml. <a href="#Lorem">The Lorem entry</a> ipsum dolor sit amet
 consectueur adipscing elit. Sed diam nomumny.
 This is a module to translate <cite>POD</cite> to Xhtml. <strong>Lorem</strong> ipsum <i>dolor</i> sit amet
-<code>consectueur adipscing</code> elit. <a name="Sed_diam_nomumny">Sed diam nomumny</a>.
+<code>consectueur adipscing</code> elit. <span id="Sed_diam_nomumny">Sed diam nomumny</span>.
 This is a module to translate POD to Xhtml. See <a href="#Lorem">Lorem</a> ipsum dolor sit amet
 consectueur adipscing elit. Sed diam <cite>nomumny</cite>. <a href="http://foo.bar/baz/">http://foo.bar/baz/</a></p>
 
-<h1><a name="METHODS"></a>METHODS</h1><p><a href="#TOP" class="toplink">Top</a></p>
+<h1 id="METHODS">METHODS</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <dl>
 	<dt>Nested blocks</dt>
 		<dd>Pod::Xhtml now supports nested over/item/back blocks:</dd>
-<ul>
+<dd><ul>
 	<li>Point 1</li>
 	<li>Point Number 2</li>
 	<li>Item three</li>
 	<li>Point four
-<br /><br />Still point four</li></ul>
+<br /><br />Still point four<pre>  This is verbatim text in a bulleted list
 
-</dl>
+</pre></li>
+</ul>
 
-<h1><a name="ATTRIBUTES"></a>ATTRIBUTES</h1><p><a href="#TOP" class="toplink">Top</a></p>
+</dd>
+<dd><pre>  This is verbatim test in a regular list
+
+</pre></dd></dl>
+<h1 id="ATTRIBUTES">ATTRIBUTES</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <dl>
 	<dt>Lorem</dt>
@@ -109,26 +132,90 @@ consectueur adipscing elit. Sed diam <cite>nomumny</cite>. <a href="http://foo.b
 	<dt>Dolor( $foo )</dt>
 		<dd>Lorem ipsum dolor sit amet consectueur .... elit. Sed diam nomumny.</dd>
 </dl>
+<h1 id="ISSUES">ISSUES</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
-<h1><a name="ISSUES"></a>ISSUES</h1><p><a href="#TOP" class="toplink">Top</a></p>
-
-<h2><a name="KNOWN_ISSUES"></a>KNOWN ISSUES</h2>
+<h2 id="KNOWN_ISSUES">KNOWN ISSUES</h2>
 
 <p>There are some issues known about. Lorem ipsum dolor sit amet consectueur adipscing elit. Sed diam nomumny.
 Lorem ipsum dolor sit amet consectueur adipscing elit. Sed diam nomumny. SPACES&nbsp;&nbsp;&nbsp;ARE&nbsp;&nbsp;IMPORTANT</p>
 
-<h2><a name="UNKNOWN_ISSUES"></a>UNKNOWN ISSUES</h2>
+<h2 id="UNKNOWN_ISSUES">UNKNOWN ISSUES</h2>
 
 <p>There are also some issues not known about. Lorem ipsum dolor sit amet consectueur adipscing elit. Sed diam nomumny.
 Lorem ipsum dolor sit amet consectueur adipscing elit. Sed diam nomumny.</p>
 
-</body>
+
+</div></body>
 };
 }
 
+sub cont_b {
+return q{
+<body>
+<div class="pod">
+<!-- INDEX START -->
+<h3 id="TOP">Index</h3>
+<ul>
+	<li><a href="#NAME">NAME</a></li>
+	<li><a href="#SYNOPSIS">SYNOPSIS</a><br />
+<ul>
+	<li><a href="#SUB_SYNOPSIS">SUB-SYNOPSIS</a></li>
+</ul>
+</li>
+	<li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+	<li><a href="#ISSUES">ISSUES</a><br />
+<ul>
+	<li><a href="#KNOWN_ISSUES">KNOWN ISSUES</a><br />
+<ul>
+	<li><a href="#Test_for_Escaped_HTML_in_Marked_text">Test for Escaped HTML in Marked text</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<hr />
+<!-- INDEX END -->
+
+<h1 id="NAME">NAME</h1><p><a href="#TOP" class="toplink">Top</a></p>
+
+<p>B - Some demo POD</p>
+
+<h1 id="SYNOPSIS">SYNOPSIS</h1><p><a href="#TOP" class="toplink">Top</a></p>
+
+<pre>	use Pod::Xhtml;
+	my $px = new Pod::Xhtml;
+
+</pre><h2 id="SUB_SYNOPSIS">SUB-SYNOPSIS</h2>
+
+<p>To test returning back to head1.</p>
+
+<h1 id="DESCRIPTION">DESCRIPTION</h1><p><a href="#TOP" class="toplink">Top</a></p>
+
+<p>This is a module to translate POD to Xhtml. Lorem ipsum <b>Dolor</b> in <cite>Dolor</cite> sit amet consectueur adipscing elit. Sed diam nomumny.</p>
+
+<h1 id="ISSUES">ISSUES</h1><p><a href="#TOP" class="toplink">Top</a></p>
+
+<h2 id="KNOWN_ISSUES">KNOWN ISSUES</h2>
+
+<h3 id="Test_for_Escaped_HTML_in_Marked_text">Test for Escaped HTML in Marked text</h3>
+
+<p><code>&lt;meta /&gt;</code></p>
+
+<p><strong>R&amp;R</strong></p>
+
+<p><i>&quot;hello&quot;</i></p>
+
+
+</div></body>
+};
+}
+
+
+
 sub readfile {
 	my $filename = shift;
-	open(IN, '<' . $filename) or die("Can't open $filename: $!");
+	local *IN;
+	open(IN, '< ' . $filename) or die("Can't open $filename: $!");
 	local $/ = undef;
 	my $x = <IN>;
 	close IN;
@@ -187,7 +274,11 @@ Point four
 
 Still point four
 
+  This is verbatim text in a bulleted list
+
 =back
+
+  This is verbatim test in a regular list
 
 =back
 

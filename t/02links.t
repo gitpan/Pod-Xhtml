@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 02links.t,v 1.3 2004/10/21 16:57:02 simonf Exp $
+#$Id: 02links.t,v 1.4 2005/04/21 16:48:04 simonf Exp $
 
 use strict;
 use lib qw(./lib ../lib);
@@ -23,15 +23,12 @@ ok($parser->seqL('crontab(5)') eq '<cite>crontab</cite>(5)');
 
 # Links to section in other manpages
 ok($parser->seqL('Pod::Xhtml/"SEE ALSO"') eq '<b>SEE ALSO</b> in <cite>Pod::Xhtml</cite>');
-
-
 ok($parser->seqL('alt text|Pod::Xhtml/"SEE ALSO"') eq '<b>alt text</b> (<b>SEE ALSO</b> in <cite>Pod::Xhtml</cite>)');
 ok($parser->seqL('Pod::Xhtml/SYNOPSIS') eq '<b>SYNOPSIS</b> in <cite>Pod::Xhtml</cite>');
 ok($parser->seqL('alt text|Pod::Xhtml/SYNOPSIS') eq '<b>alt text</b> (<b>SYNOPSIS</b> in <cite>Pod::Xhtml</cite>)');
 
 # Links to sections in this manpage
 ok($parser->seqL('/"User Guide"') eq '<a href="#User_Guide">User Guide</a>');
-
 ok($parser->seqL('alt text|/"User Guide"') eq '<a href="#User_Guide">alt text</a>');
 ok($parser->seqL('/Notes') eq '<a href="#Notes">Notes</a>');
 ok($parser->seqL('alt text|/Notes') eq '<a href="#Notes">alt text</a>');

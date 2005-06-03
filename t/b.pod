@@ -1,0 +1,31 @@
+=head1 NAME
+
+B - Some demo POD
+
+=head1 SYNOPSIS
+
+	use Pod::Xhtml;
+	my $px = new Pod::Xhtml;
+
+=head2 SUB-SYNOPSIS
+
+To test returning back to head1.
+
+=head1 DESCRIPTION
+
+This is a module to translate POD to Xhtml. Lorem ipsum L<Dolor/Dolor> sit amet consectueur adipscing elit. Sed diam nomumny.
+
+=head1 ISSUES
+
+=head2 KNOWN ISSUES
+
+=head3 Test for Escaped HTML in Marked text
+
+C<< <meta /> >>
+
+B<R&R>
+
+I<"hello">
+
+=cut
+

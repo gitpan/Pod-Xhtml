@@ -6,7 +6,7 @@ use Pod::ParseUtils;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.35 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.40 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -50,12 +50,14 @@ sub parse_from_filehandle {
 sub initialize {
 	my $self = shift;
 
-	$self->{TopLinks} = qq(<p><a href="#TOP" class="toplink">Top</a></p>) unless defined $self->{TopLinks};
+	$self->{TopLinks} = qq(<p><a href="#<<<G?TOP>>>" class="toplink">Top</a></p>) unless defined $self->{TopLinks};
 	$self->{MakeIndex} = 1 unless defined $self->{MakeIndex};
 	$self->{MakeMeta} = 1 unless defined $self->{MakeMeta};
 	$self->{FragmentOnly} = 0 unless defined $self->{FragmentOnly};
 	$self->{HeadText} = $self->{BodyOpenText} = $self->{BodyCloseText} = '';
 	$self->{LinkParser} ||= new Pod::Hyperlink;
+	$self->{IsFirstCommand} = 1;
+	$self->{FirstAnchor} = "TOP";
 	$self->SUPER::initialize();
 }
 
@@ -99,12 +101,16 @@ sub end_pod {
 
 	# now loop over each para and expand any html escapes or sequences
 	$self->_paraExpand( $_ ) foreach (@$ptree);
-	$self->{buffer} =~ s/\n?<\/pre>(\s*)<pre>/$1/sg; # concatenate 'pre' blocks
-	$self->{buffer} =~ s/<pre>\s+<\/pre>//sg;
+	$self->{buffer} =~ s/(\n?)<\/pre>\s*<pre>/$1/sg; # concatenate 'pre' blocks
+	1 while $self->{buffer} =~ s/<pre>(\s+)<\/pre>/$1/sg;
 	$self->{buffer} = $self->_makeIndex . $self->{buffer} if $self->{MakeIndex};
-	$self->{buffer} = qq(<a name="TOP"></a>) . $self->{buffer};
+	$self->{buffer} =~ s/<<<G\?TOP>>>/$self->{FirstAnchor}/ge;
+	$self->{buffer} = join "\n", qq[<div class="pod">], $self->{buffer}, "</div>";
 
-	my $headblock = qq(<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n<head>\n\t<title>) . _htmlEscape( $self->{doctitle} ) . "</title>\n";
+	my $headblock = sprintf "%s\n%s\n\t<title>%s</title>\n",
+		qq(<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">),
+		qq(<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">\n<head>),
+		_htmlEscape( $self->{doctitle} );
 	$headblock .= $self->_makeMeta if $self->{MakeMeta};
 
 	unless ($self->{FragmentOnly}) {
@@ -127,6 +133,7 @@ sub resetMe {
 	$self->{'sections'} = [];
 	$self->{'listKind'} = [];
 	$self->{'listHasItems'} = [];
+	$self->{'dataSections'} = [];
 
 	foreach (qw(inList titleflag )) { $self->{$_} = 0; }
 	foreach (qw(buffer doctitle)) { $self->{$_} = ''; }
@@ -139,17 +146,28 @@ sub _paraExpand {
 	my $para = shift;
 
 	# collapse interior sequences and strings
-	foreach ( @{$para->{'-ptree'}} ) { $_ = (ref $_) ? $self->_handleSequence($_) : _htmlEscape( $_ ); }
+	foreach ( @{$para->{'-ptree'}} ) {
+		$_ = (ref $_) ? $self->_handleSequence($_) : _htmlEscape( $_ );
+	}
 
 	# the parse tree has now been collapsed into a list of strings
 	if ($para->{TYPE} eq 'TEXT') {
+		return if @{$self->{dataSections}};
 		$self->_addTextblock( join('', @{$para->{'-ptree'}}) );
 	} elsif ($para->{TYPE} eq 'VERBATIM') {
-		my $paragraph = join('', @{$para->{'-ptree'}});
-		$self->{buffer} .= "<pre>$paragraph\n\n</pre>\n";
-		if ($self->{titleflag} != 0) { $self->_setTitle( $paragraph ); warn "NAME followed by verbatim paragraph"; }
+		return if @{$self->{dataSections}};
+		my $paragraph = "<pre>" . join('', @{$para->{'-ptree'}}) . "\n\n</pre>";
+		my $parent_list = $self->{listKind}[-1];
+		if ($parent_list && $parent_list == 2) {
+			$paragraph = "<dd>$paragraph</dd>";
+		}
+		$self->{buffer} .= $paragraph;
+		if ($self->{titleflag} != 0) {
+			$self->_setTitle( $paragraph );
+			warn "NAME followed by verbatim paragraph";
+		}
 	} elsif ($para->{TYPE} eq 'COMMAND') {
-		$self->_addCommand( $para->{'-name'}, join('', @{$para->{'-ptree'}}), $para->{'-line'} )
+		$self->_addCommand($para->{'-name'}, join('', @{$para->{'-ptree'}}), $para->{'-text'}, $para->{'-line'} )
 	} else {
 		warn "Unrecognized paragraph type $para->{TYPE} found at $self->{_INFILE} line $para->{'-line'}\n";
 	}
@@ -157,7 +175,8 @@ sub _paraExpand {
 
 sub _addCommand {
 	my $self = shift;
-	my ($command, $paragraph, $line) = @_;
+	my ($command, $paragraph, $raw_para, $line) = @_;
+	my $anchor;
 
 	unless (exists $COMMANDS{$command}) {
 		warn "Unrecognized command '$command' skipped at $self->{_INFILE} line $line\n";
@@ -166,16 +185,16 @@ sub _addCommand {
 
 	for ($command) {
 		/^head1/ && do {
-			my $anchor = $self->_addIndex( 'head1', $paragraph );
-			$self->{buffer} .= qq(<h1><a name="$anchor"></a>$paragraph</h1>)
+			$anchor = $self->_addIndex( 'head1', $paragraph );
+			$self->{buffer} .= qq(<h1 id="$anchor">$paragraph</h1>)
 					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n\n";
 			if ($anchor eq 'NAME') { $self->{titleflag} = 1; }
 			last;
 		};
 		/^head([234])/ && do {
 			my $head_level = $1;
-			my $anchor = $self->_addIndex( "head${head_level}", $paragraph );
-			$self->{buffer} .= qq(<h${head_level}><a name="$anchor"></a>$paragraph</h${head_level}>\n\n);
+			$anchor = $self->_addIndex( "head${head_level}", $paragraph );
+			$self->{buffer} .= qq(<h${head_level} id="$anchor">$paragraph</h${head_level}>\n\n);
 			last;
 		};
 		/^item/ && do {
@@ -189,6 +208,15 @@ sub _addCommand {
 
 			# is this the first item in the list?
 			if (@{$self->{listKind}} && $self->{listKind}[-1] == 0) {
+				my $parent_list = $self->{listKind}[-2]; # this is a sub-list
+				if ($parent_list && $parent_list == 1) {
+					# <ul> sub lists must be in an <li> [BEGIN]
+					$self->{buffer} .= "<li>";
+				} elsif ($parent_list && $parent_list == 2) {
+					# <dl> sub lists must be in a <dd> [BEGIN]
+					$self->{buffer} .= "<dd>";
+				}
+
 				if ($paragraph eq '*') {
 					$self->{listKind}[-1] = 1;
 					$self->{buffer} .= "<ul>\n";
@@ -203,11 +231,12 @@ sub _addCommand {
 				}
 			}
 			if (@{$self->{listKind}} && $self->{listKind}[-1] == 2) {
-				$self->{buffer} .= qq(\t<dt>);
+				$self->{buffer} .= qq(\t<dt);
 				if ($self->{MakeIndex} >= 2) {
-					my $anchor = $self->_addIndex( 'list', $paragraph );
-					$self->{buffer} .= qq(<a name="$anchor"></a>);
+					$anchor = $self->_addIndex( 'list', $paragraph );
+					$self->{buffer} .= qq( id="$anchor");
 				}
+				$self->{buffer} .= ">";
 				$self->{buffer} .= qq($paragraph</dt>\n);
 			}
 			last;
@@ -227,20 +256,60 @@ sub _addCommand {
 				warn "empty list at $self->{_INFILE} line $line\n";
 				last;
 			} elsif (@{$self->{listKind}} && $self->{listKind}[-1] == 1) {
-				$self->{buffer} .= "</li></ul>\n\n";
+				$self->{buffer} .= "</li>\n</ul>\n\n";
 			} else {
-				$self->{buffer} .= "</dl>\n\n";
+				$self->{buffer} .= "</dl>\n";
 			}
-			push @{$self->{sections}}, 'BACK';
+
+			my $parent_list = $self->{listKind}[-2]; # this is a sub-list
+			if ($parent_list && $parent_list == 1) {
+				# <ul> sub lists must be in an <li> [END]
+				$self->{buffer} .= "</li>\n";
+			}
+			if ($parent_list && $parent_list == 2) {
+				# <dl> sub lists must be in a <dd> [END]
+				$self->{buffer} .= "</dd>\n";
+			}
+
+			if ($self->{sections}[-1] eq 'OVER')
+			{
+				pop @{$self->{sections}};
+			} else {
+				push @{$self->{sections}}, 'BACK';
+			}
 			pop  @{$self->{listHasItems}};
 			pop  @{$self->{listKind}};
 			pop  @{$self->{listCurrentParas}};
 			last;
 		};
-		/^for/ || /^begin/ || /^end/ && do {
-			warn "COMMAND $_ UNIMPLEMENTED AT THE MOMENT! at $self->{_INFILE} line $line\n";
+		/^for/ && do {
+			my ($html) = $raw_para =~ /^\s*(?:pod2)?x?html\s+(.*)/;
+			$self->{buffer} .= $html if $html;
+		};
+		/^begin/ && do {
+			my ($ident) = $paragraph =~ /(\S+)/;
+			push @{$self->{dataSections}}, $ident;
 			last;
 		};
+		/^end/ && do {
+			my ($ident) = $paragraph =~ /(\S+)/;
+			unless (@{$self->{dataSections}}) {
+				warn "no corresponding '=begin $ident' marker at $self->{_INFILE} line $line\n";
+				last;
+			}
+			my $current_section = $self->{dataSections}[-1];
+			unless ($current_section eq $ident) {
+				warn "'=end $ident' doesn't match '=begin $current_section' at $self->{_INFILE} line $line\n";
+				last;
+			}
+			pop @{$self->{dataSections}};
+			last;
+		};
+	}
+	if ($anchor && $self->{IsFirstCommand})
+	{
+		$self->{FirstAnchor} = $anchor;
+		$self->{IsFirstCommand} = 0;
 	}
 }
 
@@ -273,7 +342,7 @@ sub _handleSequence {
 		if (ref $_) {
 			$buffer .= $self->_handleSequence($_);
 		} else {
-			$buffer .= $_;
+			$buffer .= _htmlEscape($_);
 		}
 	}
 
@@ -303,22 +372,79 @@ sub _addIndex {
 	return $arg;
 }
 
+sub _get_elem_level {
+	my $elem = shift;
+	if (ref($elem))
+	{
+		my $type = $elem->[0];
+		        if ($type =~ /^head(\d+)$/)
+		        {
+		            return $1;
+		        }
+		        else
+		        {
+			            return 0;
+		        }
+	    }
+	    else
+	    {
+		 return 0;
+	    }
+}
+
 sub _makeIndex {
 	my $self = shift;
-	my $string = "<!-- INDEX START -->\n<h3>Index</h3>\n<ul>\n";
-	foreach ( @{$self->{sections}} ) {
+
+	$self->{FirstAnchor} = "TOP";
+	my $string = "<!-- INDEX START -->\n<h3 id=\"TOP\">Index</h3>\n<ul>\n";
+	$self->{FirstAnchor} = "TOP";
+	my $i = 0;
+	my $previous_level = 0;
+	for (my $i=0;$i< @{$self->{sections}} ; $i++)
+	{
+		local $_ = $self->{sections}->[$i];
+		my $next = ($self->{'sections'}->[$i+1] || "");
 		if (ref $_) {
 			my ($type, $href, $name) = @$_;
-			my $index_link = qq(\t<li><a href="#${href}">${name}</a></li>);
-			$index_link = qq(<ul>$index_link</ul>) unless ($type eq 'head1');
+			my $index_link = "";
+			my $next_level = _get_elem_level($next);
+			my $this_level = _get_elem_level($_) || $previous_level;
+			if ($this_level < $previous_level)
+			{
+				$index_link .=
+					("</ul>\n</li>\n" x ($previous_level - $this_level));
+			}
+
+			$index_link .= qq(\t<li><a href="#${href}">${name}</a>);
+
+			if ($next eq "OVER")
+			{
+				$index_link .= "<br />\n";
+			}
+			elsif ($next_level > $this_level)
+			{
+				$index_link .= "<br />\n";
+				$index_link .=
+					("<ul>\n<li>\n" x ($next_level - $this_level - 1)) .
+						"<ul>\n";
+			}
+			else
+			{
+				$index_link .= "</li>\n";
+			}
+			# $index_link = qq(<ul>$index_link</ul>) unless ($type eq 'head1');
 			$string .= $index_link;
 		} elsif ($_ eq 'OVER') {
 			$string .= qq(\t<ul>\n);
 		} elsif ($_ eq 'BACK') {
-			$string .= qq(\t</ul>\n);
+			$string .= qq(\t</ul>\n</li>\n);
 		}
+		$previous_level = _get_elem_level($_) || $previous_level;
 	}
-	$string .= "</ul><hr />\n<!-- INDEX END -->\n\n";
+	$string .=
+		("</ul>\n</li>\n" x ($previous_level-1)) . "</ul>\n";
+
+	$string .= "<hr />\n<!-- INDEX END -->\n\n";
 	return $string;
 }
 
@@ -404,7 +530,7 @@ sub seqX {
 	my $self = shift;
 	my $arg = shift;
 	my $anchor = $self->_addIndex( 'head1', $arg );
-	return qq[<a name="$anchor">$arg</a>];
+	return qq[<span id="$anchor">$arg</span>];
 }
 
 sub seqE {
@@ -587,8 +713,8 @@ P Kent E<amp> Simon Flack  E<lt>cpan _at_ bbc _dot_ co _dot_ ukE<gt>
 
 =head1 COPYRIGHT
 
-(c) BBC 2004. This program is free software; you can redistribute it and/or
-modify it under the GNU GPL.
+(c) BBC 2004, 2005. This program is free software; you can redistribute it
+and/or modify it under the GNU GPL.
 
 See the file COPYING in this distribution, or http://www.gnu.org/licenses/gpl.txt
 

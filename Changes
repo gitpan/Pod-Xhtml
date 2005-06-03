@@ -1,3 +1,26 @@
+Wed June 01 15:30:00 2005 - 1.40
+	- Correctly nest bulleted lists within non-bulleted lists & vice versa
+	- Apply patch from Shlomi Fish to nest the TOC by heading level
+
+Tue May 31 18:00:00 2005 - 1.38
+	- The following changes from Shlomi Fish via RT Ticket #12718:
+		- Improved index
+		- Replace empty named anchor elements with the 'id' attribute
+		- Fix escaping of HTML metacharacters within markup commands
+	- Switch to XHTML 1.1
+	- Remove obsolete 'lang' attribute (HTML 4)
+
+Wed Apr 27 14:58:54 2005 - 1.37
+	- Add DOCTYPE (XHTML 1.0 Transitional) (Thanks to Brian Cassidy)
+	- Fix XHTML validity - some of the list types were incorrectly nested
+	  (Brian Cassidy)
+	- Fix index listing - nested lists must be in an <li> (Brian Cassidy)
+	- Fixed index generation - it no longer creates empty lists
+	- Add content-wrapper <divs> (pod & toc, like search.cpan) (Brian Cassidy)
+
+Fri Dec 10 17:38:22 2004 - 1.36 (no public release)
+	- supports =for/=begin/=end
+
 Fri Oct 22 15:49:15 2004 - 1.35
     - Public release (CPAN)
 

@@ -45,7 +45,11 @@ Point four
 
 Still point four
 
+  This is verbatim text in a bulleted list
+
 =back
+
+  This is verbatim test in a regular list
 
 =back
 
