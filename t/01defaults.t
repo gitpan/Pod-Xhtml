@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#$Id: 01defaults.t,v 1.15 2005/06/01 14:21:52 simonf Exp $
+#$Id: 01defaults.t,v 1.16 2005/06/08 17:33:12 simonf Exp $
 
 use strict;
 use lib qw(./lib ../lib);
@@ -163,10 +163,14 @@ return q{
 </ul>
 </li>
 	<li><a href="#DESCRIPTION">DESCRIPTION</a></li>
+	<li><a href="#LINKS">LINKS</a></li>
 	<li><a href="#ISSUES">ISSUES</a><br />
 <ul>
 	<li><a href="#KNOWN_ISSUES">KNOWN ISSUES</a><br />
 <ul>
+	<li><a href="#ARGV">$ARGV</a></li>
+	<li><a href="#ARGV-2">@ARGV</a></li>
+	<li><a href="#ARGV-3">%ARGV</a></li>
 	<li><a href="#Test_for_Escaped_HTML_in_Marked_text">Test for Escaped HTML in Marked text</a></li>
 </ul>
 </li>
@@ -193,9 +197,28 @@ return q{
 
 <p>This is a module to translate POD to Xhtml. Lorem ipsum <b>Dolor</b> in <cite>Dolor</cite> sit amet consectueur adipscing elit. Sed diam nomumny.</p>
 
+<h1 id="LINKS">LINKS</h1><p><a href="#TOP" class="toplink">Top</a></p>
+
+<p><a href="#ARGV-2">@ARGV</a> should link to the as-yet undefined &quot;<i>@ARGV</i>&quot; section</p>
+
+<p>Whereas <a href="#ARGV">$ARGV</a> shouldn't. It should link to the undefined
+&quot;<i>$ARGV</i>&quot; section</p>
+
 <h1 id="ISSUES">ISSUES</h1><p><a href="#TOP" class="toplink">Top</a></p>
 
 <h2 id="KNOWN_ISSUES">KNOWN ISSUES</h2>
+
+<h3 id="ARGV">$ARGV</h3>
+
+<p>Is sometimes undefined</p>
+
+<h3 id="ARGV-2">@ARGV</h3>
+
+<p>Is occasionally populated with the numbers 1, 2, 3, 4, 5, 6, 7, 8, 9 and 10</p>
+
+<h3 id="ARGV-3">%ARGV</h3>
+
+<p>Does not exist</p>
 
 <h3 id="Test_for_Escaped_HTML_in_Marked_text">Test for Escaped HTML in Marked text</h3>
 

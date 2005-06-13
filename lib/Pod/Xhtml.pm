@@ -6,7 +6,7 @@ use Pod::ParseUtils;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.40 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.41 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -101,11 +101,16 @@ sub end_pod {
 
 	# now loop over each para and expand any html escapes or sequences
 	$self->_paraExpand( $_ ) foreach (@$ptree);
+
 	$self->{buffer} =~ s/(\n?)<\/pre>\s*<pre>/$1/sg; # concatenate 'pre' blocks
 	1 while $self->{buffer} =~ s/<pre>(\s+)<\/pre>/$1/sg;
 	$self->{buffer} = $self->_makeIndex . $self->{buffer} if $self->{MakeIndex};
 	$self->{buffer} =~ s/<<<G\?TOP>>>/$self->{FirstAnchor}/ge;
 	$self->{buffer} = join "\n", qq[<div class="pod">], $self->{buffer}, "</div>";
+
+	# Expand internal L<> links to the correct sections
+	$self->{buffer} =~ s/#<<<(.*?)>>>/'#' . $self->_findSection($1)/eg;
+	die "gotcha" if $self->{buffer} =~ /#<<</;
 
 	my $headblock = sprintf "%s\n%s\n\t<title>%s</title>\n",
 		qq(<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">),
@@ -134,6 +139,8 @@ sub resetMe {
 	$self->{'listKind'} = [];
 	$self->{'listHasItems'} = [];
 	$self->{'dataSections'} = [];
+	$self->{'section_names'} = {};
+	$self->{'section_ids'} = {};
 
 	foreach (qw(inList titleflag )) { $self->{$_} = 0; }
 	foreach (qw(buffer doctitle)) { $self->{$_} = ''; }
@@ -185,7 +192,7 @@ sub _addCommand {
 
 	for ($command) {
 		/^head1/ && do {
-			$anchor = $self->_addIndex( 'head1', $paragraph );
+			$anchor = $self->_addSection( 'head1', $paragraph );
 			$self->{buffer} .= qq(<h1 id="$anchor">$paragraph</h1>)
 					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n\n";
 			if ($anchor eq 'NAME') { $self->{titleflag} = 1; }
@@ -193,7 +200,7 @@ sub _addCommand {
 		};
 		/^head([234])/ && do {
 			my $head_level = $1;
-			$anchor = $self->_addIndex( "head${head_level}", $paragraph );
+			$anchor = $self->_addSection( "head${head_level}", $paragraph );
 			$self->{buffer} .= qq(<h${head_level} id="$anchor">$paragraph</h${head_level}>\n\n);
 			last;
 		};
@@ -233,7 +240,7 @@ sub _addCommand {
 			if (@{$self->{listKind}} && $self->{listKind}[-1] == 2) {
 				$self->{buffer} .= qq(\t<dt);
 				if ($self->{MakeIndex} >= 2) {
-					$anchor = $self->_addIndex( 'list', $paragraph );
+					$anchor = $self->_addSection( 'list', $paragraph );
 					$self->{buffer} .= qq( id="$anchor");
 				}
 				$self->{buffer} .= ">";
@@ -353,23 +360,48 @@ sub _handleSequence {
 	return $SEQ{$seq->{'-name'}}->($self, $buffer);
 }
 
-sub _makeIndexName {
+sub _makeIndexId {
 	my $arg = shift;
 
-	$arg =~ s/&\w+?;/_/g;
+	$arg =~ s/\W+/_/g;
+	$arg =~ s/^_+|_+$//g;
+	$arg =~ s/__+/_/g;
 	$arg = substr($arg, 0, 36);
-	$arg =~ tr/a-zA-Z0-9_/_/c;
 	return $arg;
 }
 
-sub _addIndex {
+sub _addSection {
 	my $self = shift;
 	my ($type, $htmlarg) = @_;
 	return unless defined $htmlarg;
 
-	my $arg = _makeIndexName($htmlarg);
-	push( @{$self->{sections}}, [$type, $arg, $htmlarg]);
-	return $arg;
+	my $index_id;
+	if ($self->{section_names}{$htmlarg}) {
+		$index_id = $self->{section_names}{$htmlarg};
+	} else {
+		$index_id = _makeIndexId($htmlarg);
+		if ($self->{section_ids}{$index_id}) {
+			$index_id .= "-" . ++$self->{section_ids}{$index_id};
+		} else {
+			$self->{section_ids}{$index_id}++;
+		}
+		$self->{section_names}{$htmlarg} = $index_id;
+	}
+
+	push( @{$self->{sections}}, [$type, $index_id, $htmlarg]);
+	return $index_id;
+}
+
+sub _findSection {
+	my $self = shift;
+	my ($htmlarg) = @_;
+
+	my $index_id;
+	if ($index_id = $self->{section_names}{$htmlarg}) {
+		return $index_id;
+	} else {
+		return _makeIndexId($htmlarg);
+	}
 }
 
 sub _get_elem_level {
@@ -503,9 +535,10 @@ sub seqL {
 		my $text = _htmlEscape( $self->{LinkParser}->text );
 		$string = qq(<a href="$targ">$text</a>);
 	} elsif ($page eq '') {	# a link to this page
-		my $targ = _htmlEscape( _makeIndexName( $self->{LinkParser}->node ) );
+		# Post-process these links so we can things up to the correct sections
+		my $targ = $self->{LinkParser}->node;
 		$string = $self->{LinkParser}->markup;
-		$string =~ s|Q<(.+?)>|qq(<a href="#$targ">) . _htmlEscape( $1 ) . '</a>'|e;
+		$string =~ s|Q<(.+?)>|qq(<a href="#<<<$targ>>>">) . _htmlEscape( $1 ) . '</a>'|e;
 	} elsif ($link !~ /\|/) {	# a link off-page with _no_ alt text
 		$string = $self->{LinkParser}->markup;
 		$string =~ s|Q<(.+?)>|'<b>' . _htmlEscape( $1 ) . '</b>'|e;
@@ -529,7 +562,7 @@ sub seqS {
 sub seqX {
 	my $self = shift;
 	my $arg = shift;
-	my $anchor = $self->_addIndex( 'head1', $arg );
+	my $anchor = $self->_addSection( 'head1', $arg );
 	return qq[<span id="$anchor">$arg</span>];
 }
 
