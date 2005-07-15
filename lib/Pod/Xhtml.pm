@@ -6,7 +6,7 @@ use Pod::ParseUtils;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.41 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.43 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -191,20 +191,21 @@ sub _addCommand {
 	}
 
 	for ($command) {
-		/^head1/ && do {
+		my $data_para = @{$self->{dataSections}}; # inside a data paragraph?
+		/^head1/ && !$data_para && do {
 			$anchor = $self->_addSection( 'head1', $paragraph );
 			$self->{buffer} .= qq(<h1 id="$anchor">$paragraph</h1>)
 					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n\n";
 			if ($anchor eq 'NAME') { $self->{titleflag} = 1; }
 			last;
 		};
-		/^head([234])/ && do {
+		/^head([234])/ && !$data_para && do {
 			my $head_level = $1;
 			$anchor = $self->_addSection( "head${head_level}", $paragraph );
 			$self->{buffer} .= qq(<h${head_level} id="$anchor">$paragraph</h${head_level}>\n\n);
 			last;
 		};
-		/^item/ && do {
+		/^item/ && !$data_para && do {
 			unless ($self->{inList}) {
 				warn "Not in list at $self->{_INFILE} line $line\n";
 				last;
@@ -248,14 +249,14 @@ sub _addCommand {
 			}
 			last;
 		};
-		/^over/ && do {
+		/^over/ && !$data_para && do {
 			$self->{inList}++;
 			push @{$self->{listKind}}, 0;
 			push @{$self->{listHasItems}}, 0;
 			push @{$self->{sections}}, 'OVER';
 			push @{$self->{listCurrentParas}}, 0;
 		};
-		/^back/ && do {
+		/^back/ && !$data_para && do {
 			if (--$self->{inList} < 0) {
 				warn "=back commands don't balance =overs at $self->{_INFILE} line $line\n";
 				last;
@@ -289,11 +290,11 @@ sub _addCommand {
 			pop  @{$self->{listCurrentParas}};
 			last;
 		};
-		/^for/ && do {
+		/^for/ && !$data_para && do {
 			my ($html) = $raw_para =~ /^\s*(?:pod2)?x?html\s+(.*)/;
 			$self->{buffer} .= $html if $html;
 		};
-		/^begin/ && do {
+		/^begin/ && !$data_para && do {
 			my ($ident) = $paragraph =~ /(\S+)/;
 			push @{$self->{dataSections}}, $ident;
 			last;
@@ -526,23 +527,23 @@ sub seqL {
 	my ($self, $link) = @_;
 	$self->{LinkParser}->parse( $link );
 
-	my $page = _htmlEscape( $self->{LinkParser}->page );
+	my $page = $self->{LinkParser}->page;
 	my $kind = $self->{LinkParser}->type;
 	my $string = '';
 
 	if ($kind eq 'hyperlink') {	#easy, a hyperlink
-		my $targ = _htmlEscape( $self->{LinkParser}->node );
-		my $text = _htmlEscape( $self->{LinkParser}->text );
+		my $targ = $self->{LinkParser}->node;
+		my $text = $self->{LinkParser}->text;
 		$string = qq(<a href="$targ">$text</a>);
 	} elsif ($page eq '') {	# a link to this page
 		# Post-process these links so we can things up to the correct sections
 		my $targ = $self->{LinkParser}->node;
 		$string = $self->{LinkParser}->markup;
-		$string =~ s|Q<(.+?)>|qq(<a href="#<<<$targ>>>">) . _htmlEscape( $1 ) . '</a>'|e;
+		$string =~ s|Q<(.+?)>|<a href="#<<<$targ>>>">$1</a>|;
 	} elsif ($link !~ /\|/) {	# a link off-page with _no_ alt text
 		$string = $self->{LinkParser}->markup;
-		$string =~ s|Q<(.+?)>|'<b>' . _htmlEscape( $1 ) . '</b>'|e;
-		$string =~ s|P<(.+?)>|'<cite>' . _htmlEscape( $1 ) . '</cite>'|e;
+		$string =~ s|Q<(.+?)>|<b>$1</b>|;
+		$string =~ s|P<(.+?)>|<cite>$1</cite>|;
 	} else {	# a link off-page with alt text
 		my $text = _htmlEscape( $self->{LinkParser}->text );
 		my $targ = _htmlEscape( $self->{LinkParser}->node );

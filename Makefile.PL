@@ -3,7 +3,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
               NAME          => 'Pod::Xhtml',
               VERSION_FROM  => 'lib/Pod/Xhtml.pm',
-              EXE_FILES     => ['scripts/pod2xhtml.pl'],
+              EXE_FILES     => ['scripts/pod2xhtml'],
               PREREQ_PM => {
                             Pod::Parser => 0,
                             Pod::ParseUtils => 0,

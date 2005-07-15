@@ -5,7 +5,7 @@ MANIFEST
 MANIFEST.SKIP
 README
 lib/Pod/Xhtml.pm
-scripts/pod2xhtml.pl
+scripts/pod2xhtml
 cgi-bin/pod2xhtml.pl
 t/Test_LinkParser.pm
 t/01defaults.t

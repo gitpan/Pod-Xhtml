@@ -1,3 +1,5 @@
+#!/usr/bin/perl -w
+#$Id: pod_coverage.t,v 1.2 2005/07/15 10:27:23 simonf Exp $
 use Test::More;
 eval "use Test::Pod::Coverage 1.00";
 plan skip_all => "Test::Pod::Coverage 1.00 required for testing POD Coverage" if $@;

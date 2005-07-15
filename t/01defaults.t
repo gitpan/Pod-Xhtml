@@ -1,10 +1,17 @@
 #!/usr/bin/perl -w
-#$Id: 01defaults.t,v 1.16 2005/06/08 17:33:12 simonf Exp $
+#$Id: 01defaults.t,v 1.17 2005/07/15 10:28:37 simonf Exp $
 
 use strict;
 use lib qw(./lib ../lib);
 use Test;
 use Pod::Xhtml;
+use Getopt::Std;
+
+getopts('tTs', \my %opt);
+if ($opt{t} || $opt{T}) {
+	require Log::Trace;
+	import Log::Trace print => {Deep => $opt{T}};
+}
 
 if (-d 't') {
 	chdir( 't' );
@@ -46,7 +53,7 @@ $filecont = readfile( $podoa );
 ok( $filecont );
 ok( index( $filecont, cont_a() ) > -1 );
 undef $filecont;
-unlink $podoa;
+unlink $podoa unless $opt{'s'};
 
 my $podib = 'b.pod';
 my $podob = 'b.xhtml';
@@ -59,7 +66,7 @@ $filecont = readfile( $podob );
 ok( $filecont );
 ok( index( $filecont, cont_b() ) > -1 );
 undef $filecont;
-unlink $podob;
+unlink $podob unless $opt{'s'};
 
 sub cont_a {
 return q{
@@ -245,6 +252,7 @@ sub readfile {
 	return $x;
 }
 
+# Log::Trace stubs
 sub TRACE {}
 sub DUMP  {}
 

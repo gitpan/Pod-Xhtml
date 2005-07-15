@@ -1,17 +1,24 @@
 #!/usr/bin/perl -w
-#$Id: 02links.t,v 1.5 2005/06/13 14:58:44 simonf Exp $
+#$Id: 02links.t,v 1.6 2005/07/15 10:27:08 simonf Exp $
 
 use strict;
 use lib qw(./lib ../lib);
 use Test;
 use Pod::Xhtml;
+use Getopt::Std;
+
+getopts('tTs', \my %opt);
+if ($opt{t} || $opt{T}) {
+	require Log::Trace;
+	import Log::Trace print => {Deep => $opt{T}};
+}
 
 if (-d 't') {
 	chdir( 't' );
 }
 require Test_LinkParser;
 
-plan tests => 15;
+plan tests => 16;
 
 my $pod_links = new Test_LinkParser();
 my $parser = new Pod::Xhtml( LinkParser => $pod_links );
@@ -39,3 +46,58 @@ ok($parser->seqL('alt text|"Installation Guide"') eq '<a href="#<<<Installation 
 # Links to web pages
 ok($parser->seqL('http://bbc.co.uk/') eq '<a href="http://bbc.co.uk/">http://bbc.co.uk/</a>');
 ok($parser->seqL('http://bbc.co.uk/#top') eq '<a href="http://bbc.co.uk/#top">http://bbc.co.uk/#top</a>');
+
+my $pod_output = 'links.out';
+open(OUT, '+>'.$pod_output) or die("Can't open $pod_output: $!");
+$parser->parse_from_filehandle(\*DATA, \*OUT);
+seek OUT, 0, 0;
+my $output = do {local $/; <OUT>};
+close OUT;
+TRACE("Double encoding output ($pod_output):\n", $output);
+ok(index($output, canned_links()) > -1);
+unlink $pod_output unless $opt{'s'};
+
+sub canned_links {
+	return <<LINKS;
+<p>Test 1</p>
+
+<p><a href="http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2">http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2</a></p>
+
+<p>Test 2</p>
+
+<p><a href="http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2">Escaping Args &amp; Values</a></p>
+
+<p>Test 3</p>
+
+<p><a href="#whatisan_amp_doinghere">whatisan&amp;doinghere</a></p>
+
+<p>Test 4</p>
+
+<p><b>&quot;AUTHOR &amp; ACKNOWLEDGEMENTS&quot;</b> in <cite>Pod::Xhtml</cite>
+</p>
+LINKS
+}
+
+# Log::Trace stubs
+sub TRACE {}
+sub DUMP  {}
+
+__DATA__
+
+=head1 DOUBLE ENCODING TEST
+
+Test 1
+
+L<http://www.bbc.co.uk/opensource/test?ARG=VALE<amp>ARG2=VAL2>
+
+Test 2
+
+L<Escaping Args E<amp> Values|http://www.bbc.co.uk/opensource/test?ARG=VALE<amp>ARG2=VAL2>
+
+Test 3
+
+L<whatisanE<amp>doinghere>
+
+Test 4
+
+L<Pod::Xhtml/"AUTHOR E<amp> ACKNOWLEDGEMENTS">
