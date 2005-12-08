@@ -67,7 +67,7 @@ Lorem ipsum dolor sit amet consectueur adipscing elit. Sed diam nomumny.
 
 =item Dolor( $foo )
 
-Lorem ipsum dolor sit amet consectueur ..Z<adipscing>.. elit. Sed diam nomumny.
+Lorem ipsum dolor sit amet consectueur ..Z<>.. elit. Sed diam nomumny.
 
 =back
 

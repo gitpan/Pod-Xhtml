@@ -6,7 +6,7 @@ use Pod::ParseUtils;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.43 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.44 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);

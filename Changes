@@ -1,5 +1,8 @@
+Thu Dec  8 16:49:30 2005 - 1.44
+	- Minor fix to POD in t/a.pod
+
 Fri July 15 12:00:00 2005 - 1.43
-	_ Fix double html-escaping of links (reported by Lasse Makholm)
+	- Fix double html-escaping of links (reported by Lasse Makholm)
 	- Fix =begin/=end behaviour so processor to skip over POD commands, not just
 	  data paragraphs.
 
