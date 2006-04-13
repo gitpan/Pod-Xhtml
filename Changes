@@ -1,3 +1,10 @@
+Thu Apr 13 11:09:33 2006 - 1.51
+    Updated misc. unit tests to reflect new output formatting.
+
+Thu Apr 13 10:58:39 2006 - 1.51
+    Generation of definition lists now using single <dd> for each <dt> and various block level elements within.
+    Generated XHTML standards compliant.
+
 Thu Dec  8 16:49:30 2005 - 1.44
 	- Minor fix to POD in t/a.pod
 

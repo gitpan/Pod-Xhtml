@@ -60,19 +60,12 @@ unlink $pod_output unless $opt{'s'};
 sub canned_links {
 	return <<LINKS;
 <p>Test 1</p>
-
 <p><a href="http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2">http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2</a></p>
-
 <p>Test 2</p>
-
 <p><a href="http://www.bbc.co.uk/opensource/test?ARG=VAL&amp;ARG2=VAL2">Escaping Args &amp; Values</a></p>
-
 <p>Test 3</p>
-
 <p><a href="#whatisan_amp_doinghere">whatisan&amp;doinghere</a></p>
-
 <p>Test 4</p>
-
 <p><b>&quot;AUTHOR &amp; ACKNOWLEDGEMENTS&quot;</b> in <cite>Pod::Xhtml</cite>
 </p>
 LINKS

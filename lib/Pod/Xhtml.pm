@@ -6,7 +6,7 @@ use Pod::ParseUtils;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.44 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.51 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -112,7 +112,8 @@ sub end_pod {
 	$self->{buffer} =~ s/#<<<(.*?)>>>/'#' . $self->_findSection($1)/eg;
 	die "gotcha" if $self->{buffer} =~ /#<<</;
 
-	my $headblock = sprintf "%s\n%s\n\t<title>%s</title>\n",
+	my $headblock = sprintf "%s\n%s\n%s\n\t<title>%s</title>\n",
+		qq(<?xml version="1.0" encoding="UTF-8"?>),
 		qq(<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">),
 		qq(<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">\n<head>),
 		_htmlEscape( $self->{doctitle} );
@@ -141,6 +142,7 @@ sub resetMe {
 	$self->{'dataSections'} = [];
 	$self->{'section_names'} = {};
 	$self->{'section_ids'} = {};
+	$self->{'tagStack'} = [];
 
 	foreach (qw(inList titleflag )) { $self->{$_} = 0; }
 	foreach (qw(buffer doctitle)) { $self->{$_} = ''; }
@@ -164,11 +166,8 @@ sub _paraExpand {
 	} elsif ($para->{TYPE} eq 'VERBATIM') {
 		return if @{$self->{dataSections}};
 		my $paragraph = "<pre>" . join('', @{$para->{'-ptree'}}) . "\n\n</pre>";
-		my $parent_list = $self->{listKind}[-1];
-		if ($parent_list && $parent_list == 2) {
-			$paragraph = "<dd>$paragraph</dd>";
-		}
-		$self->{buffer} .= $paragraph;
+		# tell _addTextblock NOT to put this in a paragraph block
+		$self->_addTextblock( $paragraph );
 		if ($self->{titleflag} != 0) {
 			$self->_setTitle( $paragraph );
 			warn "NAME followed by verbatim paragraph";
@@ -219,33 +218,50 @@ sub _addCommand {
 				my $parent_list = $self->{listKind}[-2]; # this is a sub-list
 				if ($parent_list && $parent_list == 1) {
 					# <ul> sub lists must be in an <li> [BEGIN]
-					$self->{buffer} .= "<li>";
+					$self->{buffer} .= $self->_tagLevel () . "<li>\n";
+					push @{$self->{tagStack}}, "li";
 				} elsif ($parent_list && $parent_list == 2) {
-					# <dl> sub lists must be in a <dd> [BEGIN]
-					$self->{buffer} .= "<dd>";
+					# <dl> sub lists must be in a <p> [BEGIN]
+					$self->{buffer} .= $self->_tagLevel () . "<p>\n";
+					push @{$self->{tagStack}}, "p";
 				}
 
 				if ($paragraph eq '*') {
 					$self->{listKind}[-1] = 1;
-					$self->{buffer} .= "<ul>\n";
+					$self->{buffer} .= $self->_tagLevel () . "<ul>\n";
+					push @{$self->{tagStack}}, "ul";
 				} else {
 					$self->{listKind}[-1] = 2;
-					$self->{buffer} .= "<dl>\n";
+					$self->{buffer} .= $self->_tagLevel () . "<dl>\n";
+					push @{$self->{tagStack}}, "dl";
 				}
 			} else {
 				# close last list item's tag#
 				if ($self->{listKind}[-1] == 1) {
-					$self->{buffer} .= "</li>\n";
+					my $o = pop @{$self->{tagStack}};
+					warn "expected 'li' to be on the tag stack but got '$o'\n"
+						if $o ne 'li';
+					$self->{buffer} .= $self->_tagLevel () . "</li>\n";
 				}
 			}
 			if (@{$self->{listKind}} && $self->{listKind}[-1] == 2) {
-				$self->{buffer} .= qq(\t<dt);
+				if (@{$self->{tagStack}} && $self->{tagStack}[-1] eq "dd") {
+					my $o = pop @{$self->{tagStack}};
+					warn "expected 'dd' to be on the tag stack but got '$o'\n"
+						if $o ne 'dd';
+					$self->{buffer} .= $self->_tagLevel () . "</dd>\n";
+				}
+				$self->{buffer} .= $self->_tagLevel () . qq(<dt);
+				push @{$self->{tagStack}}, "dt";
 				if ($self->{MakeIndex} >= 2) {
 					$anchor = $self->_addSection( 'list', $paragraph );
 					$self->{buffer} .= qq( id="$anchor");
 				}
 				$self->{buffer} .= ">";
 				$self->{buffer} .= qq($paragraph</dt>\n);
+				my $o = pop @{$self->{tagStack}};
+				warn "expected 'dt' to be on the tag stack but got '$o'\n"
+					if $o ne 'dt';
 			}
 			last;
 		};
@@ -264,30 +280,48 @@ sub _addCommand {
 				warn "empty list at $self->{_INFILE} line $line\n";
 				last;
 			} elsif (@{$self->{listKind}} && $self->{listKind}[-1] == 1) {
+				my $o = pop @{$self->{tagStack}};
+				warn "expected 'li' to be on the tag stack but got '$o'\n"
+					if $o ne 'li';
+				$o = pop @{$self->{tagStack}};
+				warn "expected 'ul' to be on the tag stack but got '$o'\n"
+					if $o ne 'ul';
 				$self->{buffer} .= "</li>\n</ul>\n\n";
 			} else {
-				$self->{buffer} .= "</dl>\n";
+				while (@{$self->{tagStack}} && $self->{tagStack}[-1] eq "dd") {
+					pop @{$self->{tagStack}};
+					$self->{buffer} .=$self->_tagLevel () . "</dd>\n";
+				}
+				my $o = pop @{$self->{tagStack}};
+				warn "expected 'dl' to be on the tag stack but got '$o'\n"
+					if $o ne 'dl';
+				$self->{buffer} .= $self->_tagLevel () . "</dl>\n";
 			}
 
 			my $parent_list = $self->{listKind}[-2]; # this is a sub-list
 			if ($parent_list && $parent_list == 1) {
+				my $o = pop @{$self->{tagStack}};
+				warn "expected 'li' to be on the tag stack but got '$o'\n"
+					if $o ne 'li';
 				# <ul> sub lists must be in an <li> [END]
-				$self->{buffer} .= "</li>\n";
+				$self->{buffer} .= $self->_tagLevel () . "</li>\n";
 			}
 			if ($parent_list && $parent_list == 2) {
-				# <dl> sub lists must be in a <dd> [END]
-				$self->{buffer} .= "</dd>\n";
+				my $o = pop @{$self->{tagStack}};
+				warn "expected 'p' to be on the tag stack but got '$o'\n"
+					if $o ne 'p';
+				# <dl> sub lists must be in a <p> [END]
+				$self->{buffer} .= $self->_tagLevel () . "</p>\n";
 			}
 
-			if ($self->{sections}[-1] eq 'OVER')
-			{
+			if ($self->{sections}[-1] eq 'OVER') {
 				pop @{$self->{sections}};
 			} else {
 				push @{$self->{sections}}, 'BACK';
 			}
-			pop  @{$self->{listHasItems}};
-			pop  @{$self->{listKind}};
-			pop  @{$self->{listCurrentParas}};
+			pop @{$self->{listHasItems}};
+			pop @{$self->{listKind}};
+			pop @{$self->{listCurrentParas}};
 			last;
 		};
 		/^for/ && !$data_para && do {
@@ -314,8 +348,7 @@ sub _addCommand {
 			last;
 		};
 	}
-	if ($anchor && $self->{IsFirstCommand})
-	{
+	if ($anchor && $self->{IsFirstCommand}) {
 		$self->{FirstAnchor} = $anchor;
 		$self->{IsFirstCommand} = 0;
 	}
@@ -328,16 +361,37 @@ sub _addTextblock {
 	if ($self->{titleflag} != 0) { $self->_setTitle( $paragraph ); }
 
 	if (! @{$self->{listKind}} || $self->{listKind}[-1] == 0) {
-		$self->{buffer} .= "<p>$paragraph</p>\n\n";
+		# DON'T put a paragraph in a <p> if it's a <pre>!
+		if ($paragraph !~ m/^\s*<pre>/im) {
+			$self->{buffer} .= $self->_tagLevel () . "<p>$paragraph</p>\n";
+		} else {
+			$self->{buffer} .= "$paragraph\n";
+		}
 	} elsif (@{$self->{listKind}} && $self->{listKind}[-1] == 1) {
 		if ($self->{listCurrentParas}[-1]++ == 0) {
-			$self->{buffer} .= "\t<li>$paragraph";
+			# should this list item be closed?
+			push @{$self->{tagStack}}, "li";
+			$self->{buffer} .= $self->_tagLevel () . "<li>$paragraph";
 		} else {
 			$self->{buffer} .= "\n<br /><br />$paragraph";
 		}
 	} else {
-		$self->{buffer} .= "\t\t<dd>$paragraph</dd>\n";
+		if ($self->{listCurrentParas}[-1]++ == 0) {
+			$self->{buffer} .= $self->_tagLevel () . "<dd>\n";
+			push @{$self->{tagStack}}, "dd";
+		}
+
+		if ($paragraph !~ m/^\s*<pre>/im) {
+			$self->{buffer} .= $self->_tagLevel () . "<p>$paragraph</p>\n";
+		} else {
+			$self->{buffer} .= "$paragraph\n";
+		}
 	}
+}
+
+sub _tagLevel {
+	my $self = shift;
+	return ( "\t" x scalar @{$self->{tagStack}} );
 }
 
 # expand interior sequences recursively, bottom up
@@ -407,22 +461,16 @@ sub _findSection {
 
 sub _get_elem_level {
 	my $elem = shift;
-	if (ref($elem))
-	{
+	if (ref($elem)) {
 		my $type = $elem->[0];
-		        if ($type =~ /^head(\d+)$/)
-		        {
-		            return $1;
-		        }
-		        else
-		        {
-			            return 0;
-		        }
-	    }
-	    else
-	    {
-		 return 0;
-	    }
+		if ($type =~ /^head(\d+)$/) {
+			return $1;
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
 }
 
 sub _makeIndex {
@@ -433,8 +481,7 @@ sub _makeIndex {
 	$self->{FirstAnchor} = "TOP";
 	my $i = 0;
 	my $previous_level = 0;
-	for (my $i=0;$i< @{$self->{sections}} ; $i++)
-	{
+	for (my $i=0;$i< @{$self->{sections}} ; $i++) {
 		local $_ = $self->{sections}->[$i];
 		my $next = ($self->{'sections'}->[$i+1] || "");
 		if (ref $_) {
@@ -442,27 +489,21 @@ sub _makeIndex {
 			my $index_link = "";
 			my $next_level = _get_elem_level($next);
 			my $this_level = _get_elem_level($_) || $previous_level;
-			if ($this_level < $previous_level)
-			{
+			if ($this_level < $previous_level) {
 				$index_link .=
 					("</ul>\n</li>\n" x ($previous_level - $this_level));
 			}
 
 			$index_link .= qq(\t<li><a href="#${href}">${name}</a>);
 
-			if ($next eq "OVER")
-			{
+			if ($next eq "OVER") {
 				$index_link .= "<br />\n";
-			}
-			elsif ($next_level > $this_level)
-			{
+			} elsif ($next_level > $this_level) {
 				$index_link .= "<br />\n";
 				$index_link .=
 					("<ul>\n<li>\n" x ($next_level - $this_level - 1)) .
 						"<ul>\n";
-			}
-			else
-			{
+			} else {
 				$index_link .= "</li>\n";
 			}
 			# $index_link = qq(<ul>$index_link</ul>) unless ($type eq 'head1');
@@ -474,8 +515,7 @@ sub _makeIndex {
 		}
 		$previous_level = _get_elem_level($_) || $previous_level;
 	}
-	$string .=
-		("</ul>\n</li>\n" x ($previous_level-1)) . "</ul>\n";
+	$string .= ("</ul>\n</li>\n" x ($previous_level-1)) . "</ul>\n";
 
 	$string .= "<hr />\n<!-- INDEX END -->\n\n";
 	return $string;
@@ -753,3 +793,5 @@ and/or modify it under the GNU GPL.
 See the file COPYING in this distribution, or http://www.gnu.org/licenses/gpl.txt
 
 =cut
+
+# vim:noet
