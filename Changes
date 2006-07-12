@@ -1,3 +1,10 @@
+Wed Jul 12 13:08:01 2006 - 1.52
+    * generated markup now handles lists in index (via MakeIndex => 2) correctly
+    * all head section content is enclosed within a <div> with an id attribute
+      related to the name of the head section it belongs to (e.g. NAME-CONTENT).
+    * several identical id attributes will no longer be generated, instead a
+      number will be appended (ie. NAME-2).
+
 Thu Apr 13 11:09:33 2006 - 1.51
     Updated misc. unit tests to reflect new output formatting.
 

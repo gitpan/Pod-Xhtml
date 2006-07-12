@@ -10,7 +10,11 @@ cgi-bin/pod2xhtml.pl
 t/Test_LinkParser.pm
 t/01defaults.t
 t/a.pod
+t/a.xhtml
 t/b.pod
+t/b.xhtml
+t/c.pod
+t/c.xhtml
 t/02links.t
 t/pod_coverage.t
 t/pod.t

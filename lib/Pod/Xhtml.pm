@@ -3,10 +3,13 @@ package Pod::Xhtml;
 use strict;
 use Pod::Parser;
 use Pod::ParseUtils;
-use vars qw/@ISA %COMMANDS %SEQ $VERSION/;
+use vars qw/@ISA %COMMANDS %SEQ $VERSION $FirstAnchorId $ContentSuffix/;
+
+$FirstAnchorId = "TOP";
+$ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.51 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.52 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -50,14 +53,12 @@ sub parse_from_filehandle {
 sub initialize {
 	my $self = shift;
 
-	$self->{TopLinks} = qq(<p><a href="#<<<G?TOP>>>" class="toplink">Top</a></p>) unless defined $self->{TopLinks};
+	$self->{TopLinks} = qq(<p><a href="#<<<G?$FirstAnchorId>>>" class="toplink">Top</a></p>) unless defined $self->{TopLinks};
 	$self->{MakeIndex} = 1 unless defined $self->{MakeIndex};
 	$self->{MakeMeta} = 1 unless defined $self->{MakeMeta};
 	$self->{FragmentOnly} = 0 unless defined $self->{FragmentOnly};
 	$self->{HeadText} = $self->{BodyOpenText} = $self->{BodyCloseText} = '';
 	$self->{LinkParser} ||= new Pod::Hyperlink;
-	$self->{IsFirstCommand} = 1;
-	$self->{FirstAnchor} = "TOP";
 	$self->SUPER::initialize();
 }
 
@@ -105,8 +106,9 @@ sub end_pod {
 	$self->{buffer} =~ s/(\n?)<\/pre>\s*<pre>/$1/sg; # concatenate 'pre' blocks
 	1 while $self->{buffer} =~ s/<pre>(\s+)<\/pre>/$1/sg;
 	$self->{buffer} = $self->_makeIndex . $self->{buffer} if $self->{MakeIndex};
-	$self->{buffer} =~ s/<<<G\?TOP>>>/$self->{FirstAnchor}/ge;
-	$self->{buffer} = join "\n", qq[<div class="pod">], $self->{buffer}, "</div>";
+	$self->{buffer} =~ s/<<<G\?($FirstAnchorId)>>>/$1/ge;
+	$self->{buffer} = join "\n", qq[<div class="pod">], $self->{buffer},
+		( @{ $self->{sections} } > 1 && "</div>" ), "</div>";
 
 	# Expand internal L<> links to the correct sections
 	$self->{buffer} =~ s/#<<<(.*?)>>>/'#' . $self->_findSection($1)/eg;
@@ -146,6 +148,9 @@ sub resetMe {
 
 	foreach (qw(inList titleflag )) { $self->{$_} = 0; }
 	foreach (qw(buffer doctitle)) { $self->{$_} = ''; }
+	
+	# add the "$FirstAnchor" section into the sections
+	$self->_addSection ( '', $FirstAnchorId );
 }
 
 sub parse_tree { return $_[0]->{'-ptree'}; }
@@ -192,16 +197,29 @@ sub _addCommand {
 	for ($command) {
 		my $data_para = @{$self->{dataSections}}; # inside a data paragraph?
 		/^head1/ && !$data_para && do {
+			# if ANY sections are open then close the previously opened div
+			$self->{buffer} .= "\n</div>\n" unless ( @{ $self->{sections} } == 1 );
+			
 			$anchor = $self->_addSection( 'head1', $paragraph );
+			my $anchorContent = $self->_addSection( '', $paragraph . $ContentSuffix);
+
 			$self->{buffer} .= qq(<h1 id="$anchor">$paragraph</h1>)
-					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n\n";
+					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n"
+					."<div id=\"$anchorContent\">\n";
+
 			if ($anchor eq 'NAME') { $self->{titleflag} = 1; }
 			last;
 		};
 		/^head([234])/ && !$data_para && do {
 			my $head_level = $1;
+
+			# if ANY sections are open then close the previously opened div
+			$self->{buffer} .= "\n</div>\n" unless ( @{ $self->{sections} } == 1 );
+
 			$anchor = $self->_addSection( "head${head_level}", $paragraph );
-			$self->{buffer} .= qq(<h${head_level} id="$anchor">$paragraph</h${head_level}>\n\n);
+			my $anchorContent = $self->_addSection( '', $paragraph . $ContentSuffix);
+
+			$self->{buffer} .= "<h${head_level} id=\"$anchor\">$paragraph</h${head_level}>\n" . "<div id=\"$anchorContent\">\n";
 			last;
 		};
 		/^item/ && !$data_para && do {
@@ -254,7 +272,7 @@ sub _addCommand {
 				$self->{buffer} .= $self->_tagLevel () . qq(<dt);
 				push @{$self->{tagStack}}, "dt";
 				if ($self->{MakeIndex} >= 2) {
-					$anchor = $self->_addSection( 'list', $paragraph );
+					$anchor = $self->_addSection( 'item', $paragraph );
 					$self->{buffer} .= qq( id="$anchor");
 				}
 				$self->{buffer} .= ">";
@@ -269,7 +287,7 @@ sub _addCommand {
 			$self->{inList}++;
 			push @{$self->{listKind}}, 0;
 			push @{$self->{listHasItems}}, 0;
-			push @{$self->{sections}}, 'OVER';
+			push @{$self->{sections}}, 'over' if $self->{MakeIndex} >= 2;
 			push @{$self->{listCurrentParas}}, 0;
 		};
 		/^back/ && !$data_para && do {
@@ -314,11 +332,18 @@ sub _addCommand {
 				$self->{buffer} .= $self->_tagLevel () . "</p>\n";
 			}
 
-			if ($self->{sections}[-1] eq 'OVER') {
-				pop @{$self->{sections}};
-			} else {
-				push @{$self->{sections}}, 'BACK';
+			if ( $self->{MakeIndex} >= 2 ) {
+				if ( ! ref $self->{sections}->[ -1 ] ) {
+					if ( $self->{sections}->[ -1 ] =~ /^over$/i ) {
+						pop @{ $self->{sections} };
+					}
+				} else {
+					if ( $self->{sections}->[ -1 ] [ 0 ] =~ /^item$/i ) {
+						push @{ $self->{sections} }, 'back';
+					}
+				}
 			}
+
 			pop @{$self->{listHasItems}};
 			pop @{$self->{listKind}};
 			pop @{$self->{listCurrentParas}};
@@ -347,10 +372,6 @@ sub _addCommand {
 			pop @{$self->{dataSections}};
 			last;
 		};
-	}
-	if ($anchor && $self->{IsFirstCommand}) {
-		$self->{FirstAnchor} = $anchor;
-		$self->{IsFirstCommand} = 0;
 	}
 }
 
@@ -435,13 +456,16 @@ sub _addSection {
 		$index_id = $self->{section_names}{$htmlarg};
 	} else {
 		$index_id = _makeIndexId($htmlarg);
-		if ($self->{section_ids}{$index_id}) {
-			$index_id .= "-" . ++$self->{section_ids}{$index_id};
-		} else {
-			$self->{section_ids}{$index_id}++;
-		}
-		$self->{section_names}{$htmlarg} = $index_id;
 	}
+	
+	if ($self->{section_ids}{$index_id}++) {
+		$index_id .= "-" . $self->{section_ids}{$index_id};
+	}
+	
+	# if {section_names}{$htmlarg} is already set then this is a duplicate 'id',
+	# so keep the reference to the first one
+	$self->{section_names}{$htmlarg} = $index_id
+		unless exists $self->{section_names}{$htmlarg};
 
 	push( @{$self->{sections}}, [$type, $index_id, $htmlarg]);
 	return $index_id;
@@ -473,51 +497,86 @@ sub _get_elem_level {
 	}
 }
 
+sub _makeTabbing {
+	my $level = shift || 0;
+
+	return "\n" . ( "\t" x $level );
+}
+
 sub _makeIndex {
 	my $self = shift;
 
-	$self->{FirstAnchor} = "TOP";
-	my $string = "<!-- INDEX START -->\n<h3 id=\"TOP\">Index</h3>\n<ul>\n";
-	$self->{FirstAnchor} = "TOP";
-	my $i = 0;
+	my $string = "<!-- INDEX START -->\n<h3 id=\"$FirstAnchorId\">Index</h3>\n";
+
 	my $previous_level = 0;
-	for (my $i=0;$i< @{$self->{sections}} ; $i++) {
-		local $_ = $self->{sections}->[$i];
-		my $next = ($self->{'sections'}->[$i+1] || "");
-		if (ref $_) {
-			my ($type, $href, $name) = @$_;
-			my $index_link = "";
-			my $next_level = _get_elem_level($next);
-			my $this_level = _get_elem_level($_) || $previous_level;
-			if ($this_level < $previous_level) {
-				$index_link .=
-					("</ul>\n</li>\n" x ($previous_level - $this_level));
+	my $previous_section = '';
+	
+	SECTION: foreach my $section ( @{ $self->{sections} } )
+	{
+		my $this_level = 0;
+
+		if ( ! ref $section )
+		{
+			for ( $section )
+			{
+				if ( $section =~ m/^over$/i )
+				{
+					$previous_level++;
+					$string .= ( $previous_section ne 'over' && "</li>\n" ) .
+						"<li>\n<ul>\n";
+				}
+				elsif ( $section =~ m/^back$/i )
+				{
+					$previous_level--;
+					$string .= "\n</li>\n</ul>";
+				}
 			}
 
-			$index_link .= qq(\t<li><a href="#${href}">${name}</a>);
-
-			if ($next eq "OVER") {
-				$index_link .= "<br />\n";
-			} elsif ($next_level > $this_level) {
-				$index_link .= "<br />\n";
-				$index_link .=
-					("<ul>\n<li>\n" x ($next_level - $this_level - 1)) .
-						"<ul>\n";
-			} else {
-				$index_link .= "</li>\n";
-			}
-			# $index_link = qq(<ul>$index_link</ul>) unless ($type eq 'head1');
-			$string .= $index_link;
-		} elsif ($_ eq 'OVER') {
-			$string .= qq(\t<ul>\n);
-		} elsif ($_ eq 'BACK') {
-			$string .= qq(\t</ul>\n</li>\n);
+			$previous_section = $section;
 		}
-		$previous_level = _get_elem_level($_) || $previous_level;
-	}
-	$string .= ("</ul>\n</li>\n" x ($previous_level-1)) . "</ul>\n";
+		else
+		{
+			my ( $type, $href, $name ) = @$section;
+			
+			if ( $section->[ 0 ] =~ m/^item$/i )
+			{
+				$this_level = $previous_level;
+			}
+			else
+			{
+				$this_level = _get_elem_level ( $section );
+			}
 
+			next SECTION if $this_level == 0;
+			
+			if ( $this_level > $previous_level )
+			{
+				# open new list(s)
+				$string .= "\n<ul>" .
+					( "\n<li>\n<ul>" ) x ( $this_level - $previous_level - 1 );
+			}
+			elsif ( $this_level < $previous_level )
+			{
+				# close list(s)
+				$string .= "</li>\n" .
+					( "</ul>\n</li>\n" ) x ( $previous_level - $this_level );
+			}
+			else
+			{
+				$string .= "</li>\n" unless $previous_section =~ /^over$/i;
+			}
+
+			$string .= '<li><a href="#' . $href . '">' . $name . '</a>';
+
+			$previous_level = $this_level;
+
+			$previous_section = ( ref $section ? $section->[ 0 ] : $section );
+		}
+	}
+
+	$string .= ( "\n</li>\n</ul>" x $previous_level );
 	$string .= "<hr />\n<!-- INDEX END -->\n\n";
+	
 	return $string;
 }
 

@@ -1,11 +1,12 @@
 #!/usr/bin/perl -w
-#$Id: 02links.t,v 1.6 2005/07/15 10:27:08 simonf Exp $
+#$Id: 02links.t,v 1.7 2006/04/13 10:10:39 mattheww Exp $
 
 use strict;
 use lib qw(./lib ../lib);
 use Test;
 use Pod::Xhtml;
 use Getopt::Std;
+use File::Basename;
 
 getopts('tTs', \my %opt);
 if ($opt{t} || $opt{T}) {
@@ -13,9 +14,8 @@ if ($opt{t} || $opt{T}) {
 	import Log::Trace print => {Deep => $opt{T}};
 }
 
-if (-d 't') {
-	chdir( 't' );
-}
+chdir ( dirname ( $0 ) );
+
 require Test_LinkParser;
 
 plan tests => 16;
