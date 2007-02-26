@@ -3,13 +3,14 @@ package Pod::Xhtml;
 use strict;
 use Pod::Parser;
 use Pod::ParseUtils;
+use Carp;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION $FirstAnchorId $ContentSuffix/;
 
 $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.52 $' =~ m/([\d\.]+)/);
+$VERSION = '1.52_01'; # unofficial jrockway release
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -59,6 +60,9 @@ sub initialize {
 	$self->{FragmentOnly} = 0 unless defined $self->{FragmentOnly};
 	$self->{HeadText} = $self->{BodyOpenText} = $self->{BodyCloseText} = '';
 	$self->{LinkParser} ||= new Pod::Hyperlink;
+	$self->{TopHeading} ||= 1;
+	$self->{TopHeading} = int $self->{TopHeading}; # heading level must be an integer
+	croak "TopHeading must be greater than zero" if $self->{TopHeading} < 1; # (prevent negative heading levels)
 	$self->SUPER::initialize();
 }
 
@@ -197,13 +201,16 @@ sub _addCommand {
 	for ($command) {
 		my $data_para = @{$self->{dataSections}}; # inside a data paragraph?
 		/^head1/ && !$data_para && do {
+		        my $top_heading = 'h'. $self->{TopHeading};
+			$top_heading = 'h1' if !$self->{FragmentOnly}; # ignore TopHeading when not in fragment mode
+
 			# if ANY sections are open then close the previously opened div
 			$self->{buffer} .= "\n</div>\n" unless ( @{ $self->{sections} } == 1 );
 			
 			$anchor = $self->_addSection( 'head1', $paragraph );
 			my $anchorContent = $self->_addSection( '', $paragraph . $ContentSuffix);
-
-			$self->{buffer} .= qq(<h1 id="$anchor">$paragraph</h1>)
+			
+			$self->{buffer} .= qq(<$top_heading id="$anchor">$paragraph</$top_heading>)
 					.($self->{TopLinks} ? $self->{TopLinks} : '')."\n"
 					."<div id=\"$anchorContent\">\n";
 
@@ -212,7 +219,10 @@ sub _addCommand {
 		};
 		/^head([234])/ && !$data_para && do {
 			my $head_level = $1;
-
+			if($self->{FragmentOnly}){
+			    $head_level += ($self->{TopHeading} - 1);
+			    $head_level = 6 if $head_level > 6;
+			}
 			# if ANY sections are open then close the previously opened div
 			$self->{buffer} .= "\n</div>\n" unless ( @{ $self->{sections} } == 1 );
 
@@ -796,6 +806,21 @@ input file, description, etc.
 Default: 0. If 1, we only produce an XHTML fragment (suitable for use as a
 server-side include etc). There is no HEAD element nor any BODY or HTML
 tags. Any text added with the add*Text methods will B<not> be output.
+
+
+=item TopHeading
+
+Allows you to set the starting heading level when in fragment mode.
+For example, if your document already has h1 tags and you want the
+generated POD to nest inside the outline, you can specify
+
+     TopHeading => 2
+
+and C<=head1> will be tagged with h2 tags, C<=head3> with h3, and so
+on.
+
+Note that XHTML doesn't allow for heading tags past h6, so h7 and up
+will be translated to h6 as necessary.
 
 =item TopLinks
 
