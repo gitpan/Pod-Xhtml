@@ -1,10 +1,10 @@
-#$Id: Test_LinkParser.pm,v 1.4 2004/10/22 09:42:41 piersk Exp $
+#$Revision: 1.5 $
 package Test_LinkParser;
 use Pod::ParseUtils;
 use strict;
 use vars '@ISA', '$VERSION';
 @ISA = 'Pod::Hyperlink';
-$VERSION = ('$Revision: 1.4 $' =~ /([\d\.]+)/)[0];
+$VERSION = ('$Revision: 1.5 $' =~ /([\d\.]+)/)[0];
 
 # Override Pod::Hyperlink for the unit tests since different versions behave
 # differently WRT decorating links (e.g. '... elsewhere in this document')

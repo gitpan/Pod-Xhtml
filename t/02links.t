@@ -1,5 +1,5 @@
-#!/usr/bin/perl -w
-#$Id: 02links.t,v 1.7 2006/04/13 10:10:39 mattheww Exp $
+#!/usr/local/bin/perl -w
+#$Id: 02links.t,v 1.9 2006/08/29 12:48:11 andreww Exp $
 
 use strict;
 use lib qw(./lib ../lib);

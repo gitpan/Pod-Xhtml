@@ -10,7 +10,7 @@ $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-$VERSION = '1.52_01'; # unofficial jrockway release
+($VERSION) = ('$Revision: 1.56 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -201,7 +201,7 @@ sub _addCommand {
 	for ($command) {
 		my $data_para = @{$self->{dataSections}}; # inside a data paragraph?
 		/^head1/ && !$data_para && do {
-		        my $top_heading = 'h'. $self->{TopHeading};
+			my $top_heading = 'h'. $self->{TopHeading};
 			$top_heading = 'h1' if !$self->{FragmentOnly}; # ignore TopHeading when not in fragment mode
 
 			# if ANY sections are open then close the previously opened div
@@ -220,8 +220,8 @@ sub _addCommand {
 		/^head([234])/ && !$data_para && do {
 			my $head_level = $1;
 			if($self->{FragmentOnly}){
-			    $head_level += ($self->{TopHeading} - 1);
-			    $head_level = 6 if $head_level > 6;
+				$head_level += ($self->{TopHeading} - 1);
+				$head_level = 6 if $head_level > 6;
 			}
 			# if ANY sections are open then close the previously opened div
 			$self->{buffer} .= "\n</div>\n" unless ( @{ $self->{sections} } == 1 );
@@ -238,7 +238,7 @@ sub _addCommand {
 				last;
 			}
 
-			$self->{listHasItems}[-1] = 1;
+			$self->{listHasItems}[-1]++;
 			$self->{listCurrentParas}[-1] = 0;
 
 			# is this the first item in the list?
@@ -301,10 +301,11 @@ sub _addCommand {
 			push @{$self->{listCurrentParas}}, 0;
 		};
 		/^back/ && !$data_para && do {
+			my $listItems = pop @{$self->{listHasItems}};
 			if (--$self->{inList} < 0) {
 				warn "=back commands don't balance =overs at $self->{_INFILE} line $line\n";
 				last;
-			} elsif ($self->{listHasItems} == 0) {
+			} elsif ($listItems == 0) {
 				warn "empty list at $self->{_INFILE} line $line\n";
 				last;
 			} elsif (@{$self->{listKind}} && $self->{listKind}[-1] == 1) {
@@ -354,7 +355,6 @@ sub _addCommand {
 				}
 			}
 
-			pop @{$self->{listHasItems}};
 			pop @{$self->{listKind}};
 			pop @{$self->{listCurrentParas}};
 			last;
@@ -644,6 +644,17 @@ sub seqL {
 		my $targ = $self->{LinkParser}->node;
 		my $text = $self->{LinkParser}->text;
 		$string = qq(<a href="$targ">$text</a>);
+	} elsif ($kind =~ m/^bounceurl:(.+)$/) {
+		# Our link-parser has decided that the link should be handled by a particular URL
+		my $url = $1;
+		$url = _htmlEscape( $url ); # since the URL may contain ampersands
+		$string = $self->{LinkParser}->markup;
+		if ($string =~ m/P<.+>/) {	# when there's no alternative text we get P, and maybe Q
+			$string =~ s|Q<(.+?)>|<strong class="pod_xhtml_bounce_url_text">$1</strong>|;
+			$string =~ s|P<(.+?)>|<a class="pod_xhtml_bounce_url" href="$url">$1</a>|;
+		} else {
+			$string =~ s|Q<(.+?)>|<a class="pod_xhtml_bounce_url" href="$url">$1</a>|;
+		}
 	} elsif ($page eq '') {	# a link to this page
 		# Post-process these links so we can things up to the correct sections
 		my $targ = $self->{LinkParser}->node;
@@ -814,7 +825,7 @@ Allows you to set the starting heading level when in fragment mode.
 For example, if your document already has h1 tags and you want the
 generated POD to nest inside the outline, you can specify
 
-     TopHeading => 2
+	TopHeading => 2
 
 and C<=head1> will be tagged with h2 tags, C<=head3> with h3, and so
 on.
@@ -834,6 +845,10 @@ Set to 0 or '' to inhibit links, or define your own.
 An object that parses links in the POD document. By default, this is a regular
 Pod::Hyperlink object. Any user-supplied link parser must conform the the
 Pod::Hyperlink API.
+
+This module works with a L<Pod::Hyperlink::BounceURL> link parser and generates
+hyperlinks as 'a' elements with a class of 'pod_xhtml_bounce_url'. The optional
+text giving the "node" is enclosed in a 'strong' element with a class of 'pod_xhtml_bounce_url_text'
 
 =back
 

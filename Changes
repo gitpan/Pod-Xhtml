@@ -1,3 +1,7 @@
+Tue May 15 10:50:27 2007 - 1.56
+    * new TopHeading feature contributed by Jonathan Rockway
+    * added support for Pod::Hyperlink::BounceURL link parser
+
 Wed Jul 12 13:08:01 2006 - 1.52
     * generated markup now handles lists in index (via MakeIndex => 2) correctly
     * all head section content is enclosed within a <div> with an id attribute
@@ -7,8 +11,6 @@ Wed Jul 12 13:08:01 2006 - 1.52
 
 Thu Apr 13 11:09:33 2006 - 1.51
     Updated misc. unit tests to reflect new output formatting.
-
-Thu Apr 13 10:58:39 2006 - 1.51
     Generation of definition lists now using single <dd> for each <dt> and various block level elements within.
     Generated XHTML standards compliant.
 
@@ -39,8 +41,7 @@ Tue May 31 18:00:00 2005 - 1.38
 
 Wed Apr 27 14:58:54 2005 - 1.37
 	- Add DOCTYPE (XHTML 1.0 Transitional) (Thanks to Brian Cassidy)
-	- Fix XHTML validity - some of the list types were incorrectly nested
-	  (Brian Cassidy)
+	- Fix XHTML validity - some of the list types were incorrectly nested (Brian Cassidy)
 	- Fix index listing - nested lists must be in an <li> (Brian Cassidy)
 	- Fixed index generation - it no longer creates empty lists
 	- Add content-wrapper <divs> (pod & toc, like search.cpan) (Brian Cassidy)

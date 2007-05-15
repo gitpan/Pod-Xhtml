@@ -5,6 +5,7 @@ MANIFEST
 MANIFEST.SKIP
 README
 lib/Pod/Xhtml.pm
+lib/Pod/Hyperlink/BounceURL.pm
 scripts/pod2xhtml
 cgi-bin/pod2xhtml.pl
 t/Test_LinkParser.pm
@@ -15,7 +16,10 @@ t/b.pod
 t/b.xhtml
 t/c.pod
 t/c.xhtml
+t/d.pod
+t/d.xhtml
 t/02links.t
 t/pod_coverage.t
+t/Pod_Hyperlink_BounceURL.t
 t/pod.t
 META.yml                                 Module meta-data (added by MakeMaker)
