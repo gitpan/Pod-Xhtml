@@ -10,7 +10,7 @@ $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.56 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.57 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);

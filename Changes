@@ -1,3 +1,6 @@
+Fri May 18 10:42:53 2007 - 1.57
+    * Add dependency to Makefile.PL
+
 Tue May 15 10:50:27 2007 - 1.56
     * new TopHeading feature contributed by Jonathan Rockway
     * added support for Pod::Hyperlink::BounceURL link parser

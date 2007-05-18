@@ -8,6 +8,7 @@ WriteMakefile(
                             Pod::Parser => 0,
                             Pod::ParseUtils => 0,
                             Test::More => 0,
+                            Test::Assertions::TestScript => 0,
                            },
               ABSTRACT_FROM => 'lib/Pod/Xhtml.pm',
               AUTHOR        => 'British Broadcasting Corporation',
