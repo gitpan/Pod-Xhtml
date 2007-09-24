@@ -1,10 +1,9 @@
 #!/usr/local/bin/perl -w
-#$Id: 01defaults.t,v 1.23 2006/08/29 12:48:10 andreww Exp $
+#$Id: 01defaults.t,v 1.24 2007/07/16 11:09:29 andreww Exp $
 
 use strict;
 use lib qw(./lib ../lib);
-use Test;
-use Pod::Xhtml;
+use Test::More;
 use Getopt::Std;
 use File::Basename;
 
@@ -18,84 +17,48 @@ chdir ( dirname ( $0 ) );
 
 require Test_LinkParser;
 
-my $filecont;
-my $goodcont;
-
-my $podia = 'a.pod';
-my $podoa = 'a.pod.xhtml';
-my $podga = 'a.xhtml';
-
-unlink $podoa if -e $podoa;
-
-plan tests => 17;
-
-ok( $Pod::Xhtml::VERSION );
-
 my $pod_links = Test_LinkParser->new();
-my $parser = Pod::Xhtml->new(LinkParser => $pod_links);
 
-#### try parsing from file
-ok( ! -f $podoa );
-$parser->parse_from_file( $podia, $podoa );
-ok( -f $podoa );
+plan tests => 21;
 
-$filecont = readfile( $podoa );
-$goodcont = readfile( $podga );
-DUMP("filecont", \$filecont);
-ok( $filecont );
-ok( $filecont =~ m/\Q$goodcont\E/ );
-undef $filecont;
-unlink $podoa unless $opt{s};
+eval { require Pod::Xhtml };
+ok( $Pod::Xhtml::VERSION, "Pod::Xhtml compiled" );
 
-#### parsing from filehandles
-ok( ! -f $podoa );
-open(OUT, '>'.$podoa) or die("Can't open out $podoa: $!");
-$parser->parse_from_filehandle( \*DATA, \*OUT );
-close OUT;
-ok( -f $podoa );
+for my $tdata (['a'],
+			   ['b'],
+			   ['c', MakeIndex => 2],
+			   ['e'],
+			   ['FH'], # parsing from filehandle
+			  ) {
+	my($tname, %options) = @$tdata;
+	my $podi = "$tname.pod";
+	my $podo = "$tname.pod.xhtml";
+	my $podg = "$tname.xhtml";
+	my $parser = Pod::Xhtml->new(LinkParser => $pod_links, %options);
 
-$filecont = readfile( $podoa );
-DUMP("filecont", \$filecont);
-ok( $filecont );
-ok( $filecont =~ m/\Q$goodcont\E/ );
-undef $filecont;
-undef $goodcont;
-unlink $podoa unless $opt{'s'};
+	unlink $podo if -e $podo;
 
-my $podib = 'b.pod';
-my $podob = 'b.pod.xhtml';
-my $podgb = 'b.xhtml';
-unlink $podob if -e $podob;
-ok ( !-f $podob );
-$parser->parse_from_file( $podib, $podob );
-ok ( -f $podob );
+	ok( ! -f $podo, "output file ($podo) doesn't exist");
+	if($tname eq 'FH') {
+		# test parsing from filehandles
+		open(OUT, '>'.$podo) or die("Can't open out $podo: $!");
+		$parser->parse_from_filehandle( \*DATA, \*OUT );
+		close OUT;
+	} else {
+		# try parsing from file
+		$parser->parse_from_file( $podi, $podo );
+	}
+	ok( -f $podo, "output file ($podo) created" );
 
-$filecont = readfile( $podob );
-$goodcont = readfile( $podgb );
-DUMP("filecont", \$filecont);
-ok( $filecont );
-ok( $filecont =~ m/\Q$goodcont\E/ );
-undef $filecont;
-undef $goodcont;
-unlink $podob unless $opt{'s'};
-
-my $podic = "c.pod";
-my $podoc = "c.pod.xhtml";
-my $podgc = "c.xhtml";
-unlink $podoc if -e $podoc;
-ok ( ! -f $podoc );
-$parser = Pod::Xhtml->new(LinkParser => $pod_links, MakeIndex => 2);
-$parser->parse_from_file( $podic, $podoc );
-ok ( -f $podoc );
-
-$filecont = readfile( $podoc );
-$goodcont = readfile( $podgc );
-DUMP("filecont", \$filecont);
-ok( $filecont );
-ok( $filecont =~ m/\Q$goodcont\E/ );
-undef $filecont;
-undef $goodcont;
-unlink $podoc unless $opt{'s'};
+	my $filecont = readfile( $podo );
+	my $goodcont = readfile( $podg );
+	DUMP("filecont ($podo)", \$filecont);
+	DUMP("goodcont ($podg)", \$goodcont);
+	ok( $filecont, "output file contains content $tname" );
+	ok( $filecont =~ /\Q$goodcont\E/, "content $tname matches expected data" );
+	undef $filecont;
+	unlink $podo unless $opt{'s'};
+}
 
 sub readfile {
 	my $filename = shift;

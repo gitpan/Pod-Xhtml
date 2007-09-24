@@ -1,3 +1,4 @@
+# $Id: Xhtml.pm,v 1.59 2007/08/02 12:24:15 andreww Exp $
 package Pod::Xhtml;
 
 use strict;
@@ -5,12 +6,13 @@ use Pod::Parser;
 use Pod::ParseUtils;
 use Carp;
 use vars qw/@ISA %COMMANDS %SEQ $VERSION $FirstAnchorId $ContentSuffix/;
+use constant P2X_REGION => qr/(?:pod2)?xhtml/;
 
 $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.57 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.59 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -163,26 +165,33 @@ sub _paraExpand {
 	my $self = shift;
 	my $para = shift;
 
-	# collapse interior sequences and strings
-	foreach ( @{$para->{'-ptree'}} ) {
-		$_ = (ref $_) ? $self->_handleSequence($_) : _htmlEscape( $_ );
-	}
+	# skip data region unless its ident matches P2X_REGION (eg xhtml)
+	my $in_dsection = !!(@{$self->{dataSections}});
+	my $p2x_region = $in_dsection && $self->{dataSections}->[-1] =~ P2X_REGION;
+	my $skip_region = $in_dsection && !$p2x_region;
 
+	# collapse interior sequences and strings
+	# escape html unless it's a html data region
+	foreach ( @{$para->{'-ptree'}} ) {
+		$_ = (ref $_) ? $self->_handleSequence($_, $p2x_region) :
+			$p2x_region ? $_ : _htmlEscape($_);
+	}
 	# the parse tree has now been collapsed into a list of strings
+	my $string = join('', @{$para->{'-ptree'}});
+
 	if ($para->{TYPE} eq 'TEXT') {
-		return if @{$self->{dataSections}};
-		$self->_addTextblock( join('', @{$para->{'-ptree'}}) );
+		return if $skip_region;
+		$self->_addTextblock($string, $p2x_region);
 	} elsif ($para->{TYPE} eq 'VERBATIM') {
-		return if @{$self->{dataSections}};
-		my $paragraph = "<pre>" . join('', @{$para->{'-ptree'}}) . "\n\n</pre>";
-		# tell _addTextblock NOT to put this in a paragraph block
-		$self->_addTextblock( $paragraph );
+		return if $skip_region;
+		my $paragraph = "<pre>$string\n\n</pre>";
+		$self->_addTextblock( $paragraph, 1 );  # no wrap
 		if ($self->{titleflag} != 0) {
 			$self->_setTitle( $paragraph );
 			warn "NAME followed by verbatim paragraph";
 		}
 	} elsif ($para->{TYPE} eq 'COMMAND') {
-		$self->_addCommand($para->{'-name'}, join('', @{$para->{'-ptree'}}), $para->{'-text'}, $para->{'-line'} )
+		$self->_addCommand($para->{'-name'}, $string, $para->{'-text'}, $para->{'-line'} )
 	} else {
 		warn "Unrecognized paragraph type $para->{TYPE} found at $self->{_INFILE} line $para->{'-line'}\n";
 	}
@@ -360,7 +369,8 @@ sub _addCommand {
 			last;
 		};
 		/^for/ && !$data_para && do {
-			my ($html) = $raw_para =~ /^\s*(?:pod2)?x?html\s+(.*)/;
+			my($ident, $html) = $raw_para =~ /^\s*(\S+)\s+(.*)/;
+			$html = undef unless $ident =~ P2X_REGION;
 			$self->{buffer} .= $html if $html;
 		};
 		/^begin/ && !$data_para && do {
@@ -387,13 +397,15 @@ sub _addCommand {
 
 sub _addTextblock {
 	my $self = shift;
-	my $paragraph = shift;
+	my($paragraph, $no_wrap) = @_;
 
 	if ($self->{titleflag} != 0) { $self->_setTitle( $paragraph ); }
 
+	# DON'T wrap a paragraph in a <p> if it's a <pre>!
+	$no_wrap = 1 if $paragraph =~ m/^\s*<pre>/im;
+
 	if (! @{$self->{listKind}} || $self->{listKind}[-1] == 0) {
-		# DON'T put a paragraph in a <p> if it's a <pre>!
-		if ($paragraph !~ m/^\s*<pre>/im) {
+		if (!$no_wrap) {
 			$self->{buffer} .= $self->_tagLevel () . "<p>$paragraph</p>\n";
 		} else {
 			$self->{buffer} .= "$paragraph\n";
@@ -412,7 +424,7 @@ sub _addTextblock {
 			push @{$self->{tagStack}}, "dd";
 		}
 
-		if ($paragraph !~ m/^\s*<pre>/im) {
+		if (!$no_wrap) {
 			$self->{buffer} .= $self->_tagLevel () . "<p>$paragraph</p>\n";
 		} else {
 			$self->{buffer} .= "$paragraph\n";
@@ -428,14 +440,14 @@ sub _tagLevel {
 # expand interior sequences recursively, bottom up
 sub _handleSequence {
 	my $self = shift;
-	my $seq = shift;
+	my($seq, $no_escape) = @_;
 	my $buffer = '';
 
 	foreach (@{$seq->{'-ptree'}}) {
 		if (ref $_) {
 			$buffer .= $self->_handleSequence($_);
 		} else {
-			$buffer .= _htmlEscape($_);
+			$buffer .= $no_escape ? $_ : _htmlEscape($_);
 		}
 	}
 

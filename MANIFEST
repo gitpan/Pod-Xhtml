@@ -18,8 +18,11 @@ t/c.pod
 t/c.xhtml
 t/d.pod
 t/d.xhtml
+t/e.pod
+t/e.xhtml
 t/02links.t
 t/pod_coverage.t
+t/FH.xhtml
 t/Pod_Hyperlink_BounceURL.t
 t/pod.t
 META.yml                                 Module meta-data (added by MakeMaker)

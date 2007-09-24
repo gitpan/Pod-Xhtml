@@ -1,5 +1,5 @@
-Fri May 18 10:42:53 2007 - 1.57
-    * Add dependency to Makefile.PL
+Fri Sep 21 16:43:17 2007 - 1.59
+    honour xhtml content from =begin -> =end blocks, and =for lines
 
 Tue May 15 10:50:27 2007 - 1.56
     * new TopHeading feature contributed by Jonathan Rockway
