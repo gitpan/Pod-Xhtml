@@ -18,6 +18,7 @@ t/c.pod
 t/c.xhtml
 t/d.pod
 t/d.xhtml
+t/d.new.uriescape.xhtml
 t/e.pod
 t/e.xhtml
 t/02links.t

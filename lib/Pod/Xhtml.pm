@@ -1,4 +1,4 @@
-# $Id: Xhtml.pm,v 1.59 2007/08/02 12:24:15 andreww Exp $
+# $Id: Xhtml.pm,v 1.60 2007/12/21 10:52:27 andreww Exp $
 package Pod::Xhtml;
 
 use strict;
@@ -12,7 +12,7 @@ $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.59 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.60 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -695,8 +695,7 @@ sub seqS {
 sub seqX {
 	my $self = shift;
 	my $arg = shift;
-	my $anchor = $self->_addSection( 'head1', $arg );
-	return qq[<span id="$anchor">$arg</span>];
+	return qq[];
 }
 
 sub seqE {

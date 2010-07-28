@@ -1,3 +1,7 @@
+Wed Jul 28 18:17:36 2010 - 1.60
+    Index entries e.g. X<Topic> should not be rendered
+    Check for both old and new URI::Escape behaviour (RT #56324)
+
 Fri Sep 21 16:43:17 2007 - 1.59
     honour xhtml content from =begin -> =end blocks, and =for lines
 
