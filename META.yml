@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Pod-Xhtml
-version:            1.60
+version:            1.61
 abstract:           Generate well-formed XHTML documents from POD format documentation
 author:
     - British Broadcasting Corporation
@@ -15,6 +15,7 @@ requires:
     Pod::ParseUtils:      0
     Test::Assertions::TestScript:  0
     Test::More:           0
+    URI::Escape:          0
 no_index:
     directory:
         - t

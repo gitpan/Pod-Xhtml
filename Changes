@@ -1,3 +1,6 @@
+Thu Jul 29 17:18:22 2010 - 1.61
+    Add dependency on URI::Escape
+
 Wed Jul 28 18:17:36 2010 - 1.60
     Index entries e.g. X<Topic> should not be rendered
     Check for both old and new URI::Escape behaviour (RT #56324)

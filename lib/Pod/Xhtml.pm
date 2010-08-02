@@ -1,4 +1,4 @@
-# $Id: Xhtml.pm,v 1.60 2007/12/21 10:52:27 andreww Exp $
+# $Id: Xhtml.pm,v 1.61 2010/07/29 16:17:53 jamiel Exp $
 package Pod::Xhtml;
 
 use strict;
@@ -12,7 +12,7 @@ $FirstAnchorId = "TOP";
 $ContentSuffix = "-CONTENT";
 
 @ISA = qw(Pod::Parser);
-($VERSION) = ('$Revision: 1.60 $' =~ m/([\d\.]+)/);
+($VERSION) = ('$Revision: 1.61 $' =~ m/([\d\.]+)/);
 
 # recognized commands
 %COMMANDS = map { $_ => 1 } qw(pod head1 head2 head3 head4 item over back for begin end);
@@ -29,7 +29,6 @@ $ContentSuffix = "-CONTENT";
 	X => \&seqX,
 	Z => \&seqZ,
 );
-
 
 ########## New PUBLIC methods for this class
 sub asString { my $self = shift; return $self->{buffer}; }
